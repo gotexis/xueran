@@ -5,13 +5,14 @@ export type Role = {
   type: RoleType;
 };
 
-export type Player = {
+export interface Player {
   number: number;
   role: Role;
   isDead: boolean;
   drunkRole?: Role;
   specialInfo?: string;
-};
+  isPillar?: boolean;
+}
 
 export type PlayerCounts = {
   townsfolk: number;

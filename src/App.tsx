@@ -191,6 +191,16 @@ export default function App() {
       .sort(() => Math.random() - 0.5)
       .slice(0, 3) // 随机选择3个未使用的角色
     
+    // 在设置 setPlayers 之前，随机选择一个好人作为"柱子"
+    const goodPlayers = newPlayers.filter(p => 
+      p.role.type === 'townsfolk' || p.role.type === 'outsider'
+    )
+    
+    if (goodPlayers.length > 0) {
+      const pillarPlayer = goodPlayers[Math.floor(Math.random() * goodPlayers.length)]
+      pillarPlayer.isPillar = true // 标记为"柱子"
+    }
+
     setUnusedTownsfolk(remainingRoles)
     setPlayers(newPlayers)
     setViewedPlayers(new Set())
@@ -301,6 +311,61 @@ export default function App() {
       // 设置厨师的特殊信息
       chef.specialInfo = `邪恶玩家相邻数量：${evilPairs}`
     }
+
+    // 在 createGame 函数中添加共情者的初始信息处理
+    const empath = newPlayers.find(player => player.role.name === '共情者')
+    if (empath) {
+      // 初始化共情者信息
+      updateEmpathInfo(empath, newPlayers)
+    }
+  }
+
+  // 在 App 组件中添加这个新函数
+  const updateEmpathInfo = (empath: Player, playersList: Player[]) => {
+    const empathIndex = playersList.findIndex(p => p.number === empath.number)
+    const totalPlayers = playersList.length
+    
+    // 获取左边第一个活着的玩家
+    let leftPlayer = null
+    for (let i = 1; i <= totalPlayers; i++) {
+      const index = (empathIndex - i + totalPlayers) % totalPlayers
+      if (!playersList[index].isDead) {
+        leftPlayer = playersList[index]
+        break
+      }
+    }
+    
+    // 获取右边第一个活着的玩家
+    let rightPlayer = null
+    for (let i = 1; i <= totalPlayers; i++) {
+      const index = (empathIndex + i) % totalPlayers
+      if (!playersList[index].isDead) {
+        rightPlayer = playersList[index]
+        break
+      }
+    }
+    
+    // 计算邪恶玩家数量
+    const evilCount = [leftPlayer, rightPlayer].filter(player => 
+      player && (player.role.type === 'demon' || player.role.type === 'minion')
+    ).length
+    
+    empath.specialInfo = `左边${leftPlayer?.number}号和右边${rightPlayer?.number}号中有${evilCount}个邪恶玩家`
+  }
+
+  // 修改死亡状态变更的处理函数
+  const handlePlayerDeathChange = (player: Player) => {
+    const newPlayers = [...players]
+    const playerIndex = newPlayers.findIndex(p => p.number === player.number)
+    newPlayers[playerIndex] = {...player, isDead: !player.isDead}
+    
+    // 更新共情者信息
+    const empath = newPlayers.find(p => p.role.name === '共情者')
+    if (empath) {
+      updateEmpathInfo(empath, newPlayers)
+    }
+    
+    setPlayers(newPlayers)
   }
 
   // 添加排序函数
@@ -483,6 +548,7 @@ export default function App() {
                     <td className="px-4 py-2 border text-center">
                       {player.role.name}
                       {player.drunkRole && ` (以为是${player.drunkRole.name})`}
+                      {player.isPillar && ' (柱子)'}
                     </td>
                     <td className="px-4 py-2 border text-center">
                       <span className={`inline-block px-2 py-1 rounded-full text-sm ${
@@ -501,12 +567,7 @@ export default function App() {
                       <input
                         type="checkbox"
                         checked={player.isDead}
-                        onChange={() => {
-                          const newPlayers = [...players]
-                          const playerIndex = newPlayers.findIndex(p => p.number === player.number)
-                          newPlayers[playerIndex] = {...player, isDead: !player.isDead}
-                          setPlayers(newPlayers)
-                        }}
+                        onChange={() => handlePlayerDeathChange(player)}
                         className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                       />
                     </td>
