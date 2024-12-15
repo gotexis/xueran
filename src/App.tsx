@@ -270,6 +270,37 @@ export default function App() {
         investigator.specialInfo = '没有爪牙'
       }
     }
+
+    // 在处理调查员的特殊信息之后，添加处理厨师的特殊信息
+    const chef = newPlayers.find(player => player.role.name === '厨师')
+    if (chef) {
+      // 计算相邻的邪恶玩家数量（包括隐士）
+      let evilPairs = 0
+      const totalPlayers = newPlayers.length
+      
+      // 检查每个玩家和他的下一个玩家是否都是邪恶的
+      for (let i = 0; i < totalPlayers; i++) {
+        const currentPlayer = newPlayers[i]
+        // 获取下一个玩家（如果是最后一个玩家，则连接到第一个玩家）
+        const nextPlayer = newPlayers[(i + 1) % totalPlayers]
+        
+        // 判断是否为邪恶角色（恶魔、爪牙或隐士）
+        const isCurrentEvil = currentPlayer.role.type === 'demon' || 
+                             currentPlayer.role.type === 'minion' || 
+                             currentPlayer.role.name === '隐士'
+        const isNextEvil = nextPlayer.role.type === 'demon' || 
+                          nextPlayer.role.type === 'minion' || 
+                          nextPlayer.role.name === '隐士'
+        
+        // 如果两个相邻的玩家都是邪恶的，增加计数
+        if (isCurrentEvil && isNextEvil) {
+          evilPairs++
+        }
+      }
+      
+      // 设置厨师的特殊信息
+      chef.specialInfo = `邪恶玩家相邻数量：${evilPairs}`
+    }
   }
 
   // 添加排序函数
