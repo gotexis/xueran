@@ -194,6 +194,82 @@ export default function App() {
     setUnusedTownsfolk(remainingRoles)
     setPlayers(newPlayers)
     setViewedPlayers(new Set())
+    
+    // 创建玩家数组后，处理洗衣妇的特殊信息
+    const washerwoman = newPlayers.find(player => player.role.name === '洗衣妇')
+    if (washerwoman) {
+      // 找出所有村民
+      const townsfolkPlayers = newPlayers.filter(p => p.role.type === 'townsfolk' && p.role.name !== '洗衣妇')
+      // 随机选择一个村民
+      const randomTownsfolk = townsfolkPlayers[Math.floor(Math.random() * townsfolkPlayers.length)]
+      
+      // 随机选择一个非村民玩家
+      const nonTownsfolkPlayers = newPlayers.filter(p => 
+        p.number !== washerwoman.number && 
+        p.number !== randomTownsfolk.number
+      )
+      const randomOther = nonTownsfolkPlayers[Math.floor(Math.random() * nonTownsfolkPlayers.length)]
+      
+      // 随机排序这两个玩家
+      const selectedPlayers = [randomTownsfolk, randomOther].sort(() => Math.random() - 0.5)
+      
+      // 修改信息格式
+      washerwoman.specialInfo = `${selectedPlayers[0].number}，${selectedPlayers[1].number}出${randomTownsfolk.role.name}`
+    }
+
+    // 处理调查员的特殊信息`
+    const librarian = newPlayers.find(player => player.role.name === '图书管理员')
+    if (librarian) {
+      // 找出所有外来者
+      const outsiderPlayers = newPlayers.filter(p => p.role.type === 'outsider')
+      
+      if (outsiderPlayers.length > 0) {
+        // 随机选择一个外来者
+        const randomOutsider = outsiderPlayers[Math.floor(Math.random() * outsiderPlayers.length)]
+        
+        // 随机选择一个非外来者玩家
+        const nonOutsiderPlayers = newPlayers.filter(p => 
+          p.number !== librarian.number && 
+          p.number !== randomOutsider.number
+        )
+        const randomOther = nonOutsiderPlayers[Math.floor(Math.random() * nonOutsiderPlayers.length)]
+        
+        // 随机排序这两个玩家
+        const selectedPlayers = [randomOutsider, randomOther].sort(() => Math.random() - 0.5)
+        
+        // 修改信息格式
+        librarian.specialInfo = `${selectedPlayers[0].number}，${selectedPlayers[1].number}出${randomOutsider.role.name}`
+      } else {
+        librarian.specialInfo = '没有外来者'
+      }
+    }
+
+    // 处理调查员的特殊信息
+    const investigator = newPlayers.find(player => player.role.name === '调查员')
+    if (investigator) {
+      // 找出所有爪牙
+      const minionPlayers = newPlayers.filter(p => p.role.type === 'minion')
+      
+      if (minionPlayers.length > 0) {
+        // 随机选择一个爪牙
+        const randomMinion = minionPlayers[Math.floor(Math.random() * minionPlayers.length)]
+        
+        // 随机选择一个非爪牙玩家
+        const nonMinionPlayers = newPlayers.filter(p => 
+          p.number !== investigator.number && 
+          p.number !== randomMinion.number
+        )
+        const randomOther = nonMinionPlayers[Math.floor(Math.random() * nonMinionPlayers.length)]
+        
+        // 随机排序这两个玩家
+        const selectedPlayers = [randomMinion, randomOther].sort(() => Math.random() - 0.5)
+        
+        // 修改信息格式
+        investigator.specialInfo = `${selectedPlayers[0].number}，${selectedPlayers[1].number}出${randomMinion.role.name}`
+      } else {
+        investigator.specialInfo = '没有爪牙'
+      }
+    }
   }
 
   // 添加排序函数
@@ -365,6 +441,7 @@ export default function App() {
                   <th className="px-4 py-2 border">序号</th>
                   <th className="px-4 py-2 border">角色</th>
                   <th className="px-4 py-2 border">阵营</th>
+                  <th className="px-4 py-2 border">特殊信息</th>
                   <th className="px-4 py-2 border">死亡</th>
                 </tr>
               </thead>
@@ -385,6 +462,9 @@ export default function App() {
                       }`}>
                         {translations[player.role.type]}
                       </span>
+                    </td>
+                    <td className="px-4 py-2 border text-center">
+                      {player.specialInfo || '-'}
                     </td>
                     <td className="px-4 py-2 border text-center">
                       <input

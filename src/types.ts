@@ -10,6 +10,7 @@ export type Player = {
   role: Role;
   isDead: boolean;
   drunkRole?: Role;
+  specialInfo?: string;
 };
 
 export type PlayerCounts = {
