@@ -94,6 +94,7 @@ export default function App() {
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
   const [viewedPlayers, setViewedPlayers] = useState<Set<number>>(new Set())
   const [sortType, setSortType] = useState<'number' | 'firstNight' | 'otherNights'>('number')
+  const [unusedTownsfolk, setUnusedTownsfolk] = useState<string[]>([])
 
   // 从预设中选择玩家数量
   const handlePresetSelect = (totalPlayers: number) => {
@@ -180,6 +181,14 @@ export default function App() {
       }
     }
     
+    // 在创建完 selectedRoles 后，找出未使用的村民和外来者角色
+    const usedRoles = new Set(selectedRoles.map(role => role.name))
+    const remainingRoles = [...townsfolkRoles, ...outsiderRoles]
+      .filter(role => !usedRoles.has(role))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3) // 随机选择3个未使用的角色
+    
+    setUnusedTownsfolk(remainingRoles)
     setPlayers(newPlayers)
     setViewedPlayers(new Set())
   }
@@ -392,6 +401,22 @@ export default function App() {
               </tbody>
             </table>
           </div>
+          
+          {unusedTownsfolk.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-lg font-bold mb-2">未使用的善良角色：</h3>
+              <div className="flex gap-4 flex-wrap">
+                {unusedTownsfolk.map((role, index) => (
+                  <div
+                    key={index}
+                    className="px-4 py-2 bg-gray-100 rounded-lg"
+                  >
+                    {role}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => {
