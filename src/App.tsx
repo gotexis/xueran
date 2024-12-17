@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Player, Role, PlayerCounts } from './types'
 import { 
   playerCountData, 
@@ -30,7 +30,7 @@ export default function App() {
   const [showPlayerView, setShowPlayerView] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
   const [viewedPlayers, setViewedPlayers] = useState<Set<number>>(new Set())
-  const [sortType, setSortType] = useState<'number' | 'firstNight' | 'otherNights'>('number')
+  const [sortType, setSortType] = useState<'id' | 'firstNight' | 'otherNights'>('id')
   const [showSpecialInfo, setShowSpecialInfo] = useState(false)
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null)
   const [poisonedPlayer, setPoisonedPlayer] = useState<number | null>(null)
@@ -204,7 +204,7 @@ export default function App() {
   const getSortedPlayers = () => {
     const sortedPlayers = [...players]
     
-    if (sortType === 'number') {
+    if (sortType === 'id') {
       return sortedPlayers.sort((a, b) => a.number - b.number)
     }
     
@@ -245,12 +245,33 @@ export default function App() {
   }, [activeTooltip])
 
   const handlePoisonToggle = (playerNumber: number) => {
+    // 找到对应的玩家
+    const player = players.find(p => p.number === playerNumber)
+    
+    // 如果是邪恶阵营(爪牙或恶魔)，不允许中毒
+    if (player && (player.role.type === 'minion' || player.role.type === 'demon')) {
+      return
+    }
+    
     setPoisonedPlayer(poisonedPlayer === playerNumber ? null : playerNumber)
   }
 
   const handleInfoModalOpen = (player: Player) => {
     setInfoModalPlayer(player.number)
-    setTempSpecialInfo(player.specialInfo || '')
+    
+    let info = player.specialInfo || ''
+    
+    // 如果玩家中毒，添加中毒标记
+    if (poisonedPlayer === player.number) {
+      info = `${info} {{{中毒}}}`
+    }
+    
+    // 如果是酒鬼，添加酒鬼标记
+    if (player.role.name === '酒鬼') {
+      info = `${info} {{{酒鬼}}}`
+    }
+    
+    setTempSpecialInfo(info)
   }
 
   return (
@@ -269,7 +290,7 @@ export default function App() {
                     {translations[type]}
                   </span>
                   <input
-                    type="number"
+                    type="number" 
                     value={counts[type]} 
                     disabled={type === 'demon'}
                     onChange={e => setCounts({...counts, [type]: parseInt(e.target.value) || 0})}
@@ -383,13 +404,13 @@ export default function App() {
             <div className="mb-4 flex justify-between items-center bg-white rounded-lg p-1 shadow-sm border border-gray-200">
               <div className="flex space-x-2">
                 {[
-                  { value: 'number', label: '按座位号排序' },
+                  { value: 'id', label: '按座位号排序' },
                   { value: 'firstNight', label: '首夜行动顺序' },
                   { value: 'otherNights', label: 'night行动顺序' }
                 ].map(option => (
                   <button
                     key={option.value}
-                    onClick={() => setSortType(option.value as 'number' | 'firstNight' | 'otherNights')}
+                    onClick={() => setSortType(option.value as 'id' | 'firstNight' | 'otherNights')}
                     className={`px-4 py-2 rounded-md transition-colors ${
                       sortType === option.value
                         ? 'bg-blue-500 text-white'
@@ -432,7 +453,7 @@ export default function App() {
                 </thead>
                 <tbody>
                   {getSortedPlayers().map(player => {
-                    const isInActionOrder = sortType === 'number' || (
+                    const isInActionOrder = sortType === 'id' || (
                       sortType === 'firstNight' 
                         ? FIRST_NIGHT_ORDER.includes(player.role.name)
                         : OTHER_NIGHTS_ORDER.includes(player.role.name)
@@ -443,7 +464,7 @@ export default function App() {
                         key={player.number} 
                         className={`hover:bg-gray-50 border-b border-gray-200 ${
                           player.isDead ? 'opacity-50' : ''
-                        } ${!isInActionOrder && sortType !== 'number' ? 'opacity-40' : ''}`}
+                        } ${!isInActionOrder ? 'opacity-40' : ''}`}
                       >
                         <td 
                           className="px-4 py-1.5 text-center cursor-pointer relative"
@@ -505,16 +526,18 @@ export default function App() {
                           </button>
                         </td>
                         <td className="px-4 py-1.5 text-center">
-                          <button
-                            onClick={() => handlePoisonToggle(player.number)}
-                            className={`w-6 h-6 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
-                              poisonedPlayer === player.number
-                                ? 'border-purple-500 text-purple-500 bg-purple-50'
-                                : 'border-gray-300 text-gray-300 hover:border-purple-500 hover:text-purple-500'
-                            }`}
-                          >
-                            {poisonedPlayer === player.number ? '☠️' : ''}
-                          </button>
+                          {player.role.type !== 'minion' && player.role.type !== 'demon' && (
+                            <button
+                              onClick={() => handlePoisonToggle(player.number)}
+                              className={`w-6 h-6 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
+                                poisonedPlayer === player.number
+                                  ? 'border-purple-500 text-purple-500 bg-purple-50'
+                                  : 'border-gray-300 text-gray-300 hover:border-purple-500 hover:text-purple-500'
+                              }`}
+                            >
+                              {poisonedPlayer === player.number ? '☠️' : ''}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )
@@ -574,7 +597,7 @@ export default function App() {
                       </p>
                       <div className="mb-4">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          特殊信息
+                          特殊信息 (DM需要考虑中毒 / 醉酒)
                         </label>
                         <textarea
                           value={tempSpecialInfo}
@@ -590,6 +613,12 @@ export default function App() {
                         className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
                       >
                         关闭
+                      </button>
+                      <button
+                        onClick={() => setTempSpecialInfo('')}
+                        className="flex-1 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-red-600"
+                      >
+                        清空
                       </button>
                     </div>
                   </>
