@@ -1,88 +1,22 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Player, Role, PlayerCounts } from './types'
-
-// 玩家数量，平民，外来者，爪牙，恶魔 (always 1)
-const playerCountData = [
-  [5, 3, 0, 1, 1],
-  [6, 3, 1, 1, 1],
-  [7, 5, 0, 2, 1],
-  [8, 5, 1, 1, 1],
-  [9, 5, 2, 1, 1],
-  [10, 7, 0, 2, 1],
-  [11, 7, 1, 2, 1],
-  [12, 7, 2, 2, 1],
-  [13, 9, 0, 3, 1],
-  [14, 9, 1, 3, 1],
-  [15, 9, 2, 3, 1],
-  [16, 10, 2, 3, 1],
-  [17, 11, 2, 3, 1],
-  [18, 12, 2, 3, 1],
-]
-
-const townsfolkRoles = [
-  "洗衣妇",
-  "图书管理员",
-  "调查员",
-  "厨师",
-  "共情者",
-  "占卜师",
-  "送葬者",
-  "僧侣",
-  "渡鸦",
-  "处女",
-  "杀手",
-  "士兵",
-  "市长",
-]
-
-const outsiderRoles = [
-  "管家",
-  "酒鬼",
-  "隐士",
-  "圣徒",
-]
-
-const minionRoles = [
-  "投毒者",
-  "间谍",
-  "猩红女郎",
-  "男爵",
-]
-
-const translations = {
-  "townsfolk": "村民",
-  "outsider": "外来者",
-  "minion": "爪牙",
-  "demon": "恶魔",
-}
-
-// 在文件顶部添加排序顺序的常量
-const FIRST_NIGHT_ORDER = [
-  "爪牙", // 特殊情况，用于显示
-  "恶魔", // 特殊情况，用于显示
-  "投毒者",
-  "洗衣妇",
-  "图书管理员",
-  "调查员",
-  "厨师",
-  "共情者",
-  "占卜师",
-  "管家",
-  "间谍",
-]
-
-const OTHER_NIGHTS_ORDER = [
-  "投毒者",
-  "僧侣",
-  "猩红女郎",
-  "小恶魔",
-  "渡鸦",
-  "共情者",
-  "占卜师",
-  "管家",
-  "送葬者",
-  "间谍",
-]
+import { 
+  playerCountData, 
+  townsfolkRoles, 
+  outsiderRoles, 
+  minionRoles, 
+  translations,
+  FIRST_NIGHT_ORDER,
+  OTHER_NIGHTS_ORDER 
+} from './constants'
+import {
+  handleWasherwomanInfo,
+  handleLibrarianInfo,
+  handleInvestigatorInfo,
+  handleChefInfo,
+  handleEmpathInfo,
+  handleDemonInfo
+} from './specialRoleInfoHandlers'
 
 export default function App() {
   const [counts, setCounts] = useState<PlayerCounts>({
@@ -97,7 +31,11 @@ export default function App() {
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
   const [viewedPlayers, setViewedPlayers] = useState<Set<number>>(new Set())
   const [sortType, setSortType] = useState<'number' | 'firstNight' | 'otherNights'>('number')
-  const [unusedTownsfolk, setUnusedTownsfolk] = useState<string[]>([])
+  const [showSpecialInfo, setShowSpecialInfo] = useState(false)
+  const [activeTooltip, setActiveTooltip] = useState<number | null>(null)
+  const [poisonedPlayer, setPoisonedPlayer] = useState<number | null>(null)
+  const [infoModalPlayer, setInfoModalPlayer] = useState<number | null>(null)
+  const [tempSpecialInfo, setTempSpecialInfo] = useState<string>('')
 
   // 从预设中选择玩家数量
   const handlePresetSelect = (totalPlayers: number) => {
@@ -201,115 +139,31 @@ export default function App() {
       pillarPlayer.isPillar = true // 标记为"柱子"
     }
 
-    setUnusedTownsfolk(remainingRoles)
     setPlayers(newPlayers)
     setViewedPlayers(new Set())
     
     // 创建玩家数组后，处理洗衣妇的特殊信息
     const washerwoman = newPlayers.find(player => player.role.name === '洗衣妇')
     if (washerwoman) {
-      // 找出所有村民
-      const townsfolkPlayers = newPlayers.filter(p => p.role.type === 'townsfolk' && p.role.name !== '洗衣妇')
-      // 随机选择一个村民
-      const randomTownsfolk = townsfolkPlayers[Math.floor(Math.random() * townsfolkPlayers.length)]
-      
-      // 随机选择一个非村民玩家
-      const nonTownsfolkPlayers = newPlayers.filter(p => 
-        p.number !== washerwoman.number && 
-        p.number !== randomTownsfolk.number
-      )
-      const randomOther = nonTownsfolkPlayers[Math.floor(Math.random() * nonTownsfolkPlayers.length)]
-      
-      // 随机排序这两个玩家
-      const selectedPlayers = [randomTownsfolk, randomOther].sort(() => Math.random() - 0.5)
-      
-      // 修改信息格式
-      washerwoman.specialInfo = `${selectedPlayers[0].number}，${selectedPlayers[1].number}出${randomTownsfolk.role.name}`
+      washerwoman.specialInfo = handleWasherwomanInfo(washerwoman, newPlayers)
     }
 
     // 处理调查员的特殊信息`
     const librarian = newPlayers.find(player => player.role.name === '图书管理员')
     if (librarian) {
-      // 找出所有外来者
-      const outsiderPlayers = newPlayers.filter(p => p.role.type === 'outsider')
-      
-      if (outsiderPlayers.length > 0) {
-        // 随机选择一个外来者
-        const randomOutsider = outsiderPlayers[Math.floor(Math.random() * outsiderPlayers.length)]
-        
-        // 随机选择一个非外来者玩家
-        const nonOutsiderPlayers = newPlayers.filter(p => 
-          p.number !== librarian.number && 
-          p.number !== randomOutsider.number
-        )
-        const randomOther = nonOutsiderPlayers[Math.floor(Math.random() * nonOutsiderPlayers.length)]
-        
-        // 随机排序这两个玩家
-        const selectedPlayers = [randomOutsider, randomOther].sort(() => Math.random() - 0.5)
-        
-        // 修改信息格式
-        librarian.specialInfo = `${selectedPlayers[0].number}，${selectedPlayers[1].number}出${randomOutsider.role.name}`
-      } else {
-        librarian.specialInfo = '没有外来者'
-      }
+      librarian.specialInfo = handleLibrarianInfo(librarian, newPlayers)
     }
 
     // 处理调查员的特殊信息
     const investigator = newPlayers.find(player => player.role.name === '调查员')
     if (investigator) {
-      // 找出所有爪牙
-      const minionPlayers = newPlayers.filter(p => p.role.type === 'minion')
-      
-      if (minionPlayers.length > 0) {
-        // 随机选择一个爪牙
-        const randomMinion = minionPlayers[Math.floor(Math.random() * minionPlayers.length)]
-        
-        // 随机选择一个非爪牙玩家
-        const nonMinionPlayers = newPlayers.filter(p => 
-          p.number !== investigator.number && 
-          p.number !== randomMinion.number
-        )
-        const randomOther = nonMinionPlayers[Math.floor(Math.random() * nonMinionPlayers.length)]
-        
-        // 随机排序这两个玩家
-        const selectedPlayers = [randomMinion, randomOther].sort(() => Math.random() - 0.5)
-        
-        // 修改信息格式
-        investigator.specialInfo = `${selectedPlayers[0].number}，${selectedPlayers[1].number}出${randomMinion.role.name}`
-      } else {
-        investigator.specialInfo = '没有爪牙'
-      }
+      investigator.specialInfo = handleInvestigatorInfo(investigator, newPlayers)
     }
 
     // 在处理调查员的特殊信息之后，添加处理厨师的特殊信息
     const chef = newPlayers.find(player => player.role.name === '厨师')
     if (chef) {
-      // 计算相邻的邪恶玩家数量（包括隐士）
-      let evilPairs = 0
-      const totalPlayers = newPlayers.length
-      
-      // 检查每个玩家和他的下一个玩家是否都是邪恶的
-      for (let i = 0; i < totalPlayers; i++) {
-        const currentPlayer = newPlayers[i]
-        // 获取下一个玩家（如果是最后一个玩家，则连接到第一个玩家）
-        const nextPlayer = newPlayers[(i + 1) % totalPlayers]
-        
-        // 判断是否为邪恶角色（恶魔、爪牙或隐士）
-        const isCurrentEvil = currentPlayer.role.type === 'demon' || 
-                             currentPlayer.role.type === 'minion' || 
-                             currentPlayer.role.name === '隐士'
-        const isNextEvil = nextPlayer.role.type === 'demon' || 
-                          nextPlayer.role.type === 'minion' || 
-                          nextPlayer.role.name === '隐士'
-        
-        // 如果两个相邻的玩家都是邪恶的，增加计数
-        if (isCurrentEvil && isNextEvil) {
-          evilPairs++
-        }
-      }
-      
-      // 设置厨师的特殊信息
-      chef.specialInfo = `邪恶玩家相邻数量：${evilPairs}`
+      chef.specialInfo = handleChefInfo(newPlayers)
     }
 
     // 在 createGame 函数中添加共情者的初始信息处理
@@ -318,39 +172,17 @@ export default function App() {
       // 初始化共情者信息
       updateEmpathInfo(empath, newPlayers)
     }
+
+    // 在其他特殊信息处理之后添加
+    const demon2 = newPlayers.find(player => player.role.name === '小恶魔')
+    if (demon2) {
+      demon2.specialInfo = handleDemonInfo(remainingRoles)
+    }
   }
 
   // 在 App 组件中添加这个新函数
   const updateEmpathInfo = (empath: Player, playersList: Player[]) => {
-    const empathIndex = playersList.findIndex(p => p.number === empath.number)
-    const totalPlayers = playersList.length
-    
-    // 获取左边第一个活着的玩家
-    let leftPlayer = null
-    for (let i = 1; i <= totalPlayers; i++) {
-      const index = (empathIndex - i + totalPlayers) % totalPlayers
-      if (!playersList[index].isDead) {
-        leftPlayer = playersList[index]
-        break
-      }
-    }
-    
-    // 获取右边第一个活着的玩家
-    let rightPlayer = null
-    for (let i = 1; i <= totalPlayers; i++) {
-      const index = (empathIndex + i) % totalPlayers
-      if (!playersList[index].isDead) {
-        rightPlayer = playersList[index]
-        break
-      }
-    }
-    
-    // 计算邪恶玩家数量
-    const evilCount = [leftPlayer, rightPlayer].filter(player => 
-      player && (player.role.type === 'demon' || player.role.type === 'minion')
-    ).length
-    
-    empath.specialInfo = `左边${leftPlayer?.number}号和右边${rightPlayer?.number}号中有${evilCount}个邪恶玩家`
+    empath.specialInfo = handleEmpathInfo(empath, playersList)
   }
 
   // 修改死亡状态变更的处理函数
@@ -399,199 +231,297 @@ export default function App() {
     })
   }
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (activeTooltip !== null && !(event.target as Element).closest('.tooltip-trigger')) {
+        setActiveTooltip(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [activeTooltip])
+
+  const handlePoisonToggle = (playerNumber: number) => {
+    setPoisonedPlayer(poisonedPlayer === playerNumber ? null : playerNumber)
+  }
+
+  const handleInfoModalOpen = (player: Player) => {
+    setInfoModalPlayer(player.number)
+    setTempSpecialInfo(player.specialInfo || '')
+  }
+
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <div className="mb-8">
-        <div className="flex items-center justify-center gap-4 mb-6">
-          <span>管理员视图</span>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              className="sr-only peer"
-              checked={showPlayerView}
-              onChange={e => setShowPlayerView(e.target.checked)}
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-          </label>
-          <span>玩家视图</span>
-        </div>
-        
-        <div className="flex flex-wrap gap-4 justify-center mb-6">
-          {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => (
-            <input
-              key={type}
-              type="number"
-              value={counts[type]} 
-              disabled={type === 'demon'}
-              onChange={e => setCounts({...counts, [type]: parseInt(e.target.value) || 0})}
-              placeholder={`${translations[type]}数量`}
-              className="w-24 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          ))}
-        </div>
-        
-        <div className="flex flex-wrap gap-2 justify-center mb-6">
-          {playerCountData.map(([total]) => (
-            <button 
-              key={total} 
-              onClick={() => handlePresetSelect(total)}
-              className="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
-            >
-              {total}人局
-            </button>
-          ))}
-        </div>
-        
-        <button 
-          onClick={createGame}
-          className="w-full max-w-xs mx-auto block px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          创建游戏
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-50 text-gray-900">
+      <div className="max-w-4xl mx-auto p-4">
+        <div className="mb-6 bg-white rounded-lg p-4 shadow-md border border-gray-200 ">
+          <h1 className="text-xl text-white px-2 mb-6 bg-gradient-to-r from-blue-500 to-purple-500">
+            Exis的血染-暗流涌动DM工具箱
+          </h1>
 
-      {showPlayerView && players.length > 0 && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4">
-            <h2 className="text-xl font-bold mb-4 text-center">选择你的座位号</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mb-4">
-              {players.map(player => {
-                const isViewed = viewedPlayers.has(player.number)
-                return (
-                  <button
-                    key={player.number}
-                    onClick={() => setSelectedPlayer(player.number)}
-                    disabled={isViewed}
-                    className={`px-4 py-2 rounded-lg ${
-                      isViewed 
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                        : 'bg-blue-100 hover:bg-blue-200'
-                    }`}
-                  >
-                    {player.number}号
-                  </button>
-                )
-              })}
-            </div>
-            <button
-              onClick={() => setShowPlayerView(false)}
-              className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-              关闭玩家视图
-            </button>
-          </div>
-        </div>
-      )}
-
-      {selectedPlayer && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4">
-            <h2 className="text-xl font-bold mb-4 text-center">{selectedPlayer}号玩家的角色</h2>
-            {(() => {
-              const player = players.find(p => p.number === selectedPlayer)
-              if (!player) return null
-              
-              const displayRole = player.role.name === '酒鬼' && player.drunkRole
-                ? player.drunkRole.name
-                : player.role.name
-
-              return (
-                <div className="text-center mb-4">
-                  <p className="text-2xl mb-2">{displayRole}</p>
-                  <p className="text-lg text-gray-600">
-                    {translations[player.role.name === '酒鬼' ? 'townsfolk' : player.role.type]}
-                  </p>
+          <div className="flex flex-wrap items-center gap-4 justify-center mb-4">
+            {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => (
+              <div key={type} className="flex-shrink-0">
+                <div className="relative flex rounded-md shadow-sm">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                    {translations[type]}
+                  </span>
+                  <input
+                    type="number"
+                    value={counts[type]} 
+                    disabled={type === 'demon'}
+                    onChange={e => setCounts({...counts, [type]: parseInt(e.target.value) || 0})}
+                    className="rounded-r-md block w-16 border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-sm text-center"
+                  />
                 </div>
-              )
-            })()}
-            <button
-              onClick={() => {
-                setViewedPlayers(prev => new Set([...prev, selectedPlayer]))
-                setSelectedPlayer(null)
-              }}
-              className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              关闭
-            </button>
-          </div>
-        </div>
-      )}
+              </div>
+            ))}
 
-      {!showPlayerView && players.length > 0 && (
-        <>
-          <div className="mb-4">
-            <select
-              value={sortType}
-              onChange={(e) => setSortType(e.target.value as 'number' | 'firstNight' | 'otherNights')}
-              className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="number">按座位号排序</option>
-              <option value="firstNight">第一夜行动顺序</option>
-              <option value="otherNights">其他夜晚行动顺序</option>
-            </select>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="px-4 py-2 border">序号</th>
-                  <th className="px-4 py-2 border">角色</th>
-                  <th className="px-4 py-2 border">阵营</th>
-                  <th className="px-4 py-2 border">特殊信息</th>
-                  <th className="px-4 py-2 border">死亡</th>
-                </tr>
-              </thead>
-              <tbody>
-                {getSortedPlayers().map(player => (
-                  <tr key={player.number} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 border text-center">{player.number}</td>
-                    <td className="px-4 py-2 border text-center">
-                      {player.role.name}
-                      {player.drunkRole && ` (以为是${player.drunkRole.name})`}
-                      {player.isPillar && ' (柱子)'}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      <span className={`inline-block px-2 py-1 rounded-full text-sm ${
-                        player.role.type === 'townsfolk' ? 'bg-blue-100 text-blue-800' :
-                        player.role.type === 'outsider' ? 'bg-green-100 text-green-800' :
-                        player.role.type === 'minion' ? 'bg-red-100 text-red-800' :
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {translations[player.role.type]}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      {player.specialInfo || '-'}
-                    </td>
-                    <td className="px-4 py-2 border text-center">
-                      <input
-                        type="checkbox"
-                        checked={player.isDead}
-                        onChange={() => handlePlayerDeathChange(player)}
-                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                      />
-                    </td>
-                  </tr>
+            <div className="flex-shrink-0">
+              <select
+                onChange={(e) => handlePresetSelect(parseInt(e.target.value))}
+                className="rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+              >
+                <option value="">选择玩家数量</option>
+                {playerCountData.map(([total]) => (
+                  <option key={total} value={total}>{total}人局</option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
           </div>
           
-          {unusedTownsfolk.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-bold mb-2">未使用的善良角色：</h3>
-              <div className="flex gap-4 flex-wrap">
-                {unusedTownsfolk.map((role, index) => (
-                  <div
-                    key={index}
-                    className="px-4 py-2 bg-gray-100 rounded-lg"
-                  >
-                    {role}
+          <div className="flex justify-center gap-4">
+            <button 
+              onClick={createGame}
+              className="px-4 py-1.5 bg-blue-500 hover:bg-blue-600 rounded transition-colors text-white shadow-md text-sm"
+            >
+              创建游戏
+            </button>
+
+            {players.length > 0 && (
+              <button 
+                onClick={() => setShowPlayerView(true)}
+                className="px-4 py-1.5 bg-green-500 hover:bg-green-600 rounded transition-colors text-white shadow-md text-sm"
+              >
+                进入玩家视图
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showPlayerView && players.length > 0 && (
+          <div className="fixed inset-0 bg-black bg-opacity-0 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4">
+              <h2 className="text-xl font-bold mb-4 text-center">选择你的座位号</h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mb-4">
+                {players.map(player => {
+                  const isViewed = viewedPlayers.has(player.number)
+                  return (
+                    <button
+                      key={player.number}
+                      onClick={() => setSelectedPlayer(player.number)}
+                      disabled={isViewed}
+                      className={`px-4 py-2 rounded-lg ${
+                        isViewed 
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : 'bg-blue-100 hover:bg-blue-200'
+                      }`}
+                    >
+                      {player.number}号
+                    </button>
+                  )
+                })}
+              </div>
+              <button
+                onClick={() => setShowPlayerView(false)}
+                className="w-full px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+              >
+                关闭玩家视图
+              </button>
+            </div>
+          </div>
+        )}
+
+        {selectedPlayer && (
+          <div className="fixed inset-0 bg-black bg-opacity-0 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4">
+              <h2 className="text-xl font-bold mb-4 text-center">{selectedPlayer}号玩家的角色</h2>
+              {(() => {
+                const player = players.find(p => p.number === selectedPlayer)
+                if (!player) return null
+                
+                const displayRole = player.role.name === '酒鬼' && player.drunkRole
+                  ? player.drunkRole.name
+                  : player.role.name
+
+                return (
+                  <div className="text-center mb-4">
+                    <p className="text-2xl mb-2">{displayRole}</p>
+                    <p className="text-lg text-gray-600">
+                      {translations[player.role.name === '酒鬼' ? 'townsfolk' : player.role.type]}
+                    </p>
                   </div>
+                )
+              })()}
+              <button
+                onClick={() => {
+                  setViewedPlayers(prev => new Set([...prev, selectedPlayer]))
+                  setSelectedPlayer(null)
+                }}
+                className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!showPlayerView && players.length > 0 && (
+          <>
+            <div className="mb-4 flex justify-between items-center bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+              <div className="flex space-x-2">
+                {[
+                  { value: 'number', label: '按座位号排序' },
+                  { value: 'firstNight', label: '首夜行动顺序' },
+                  { value: 'otherNights', label: 'night行动顺序' }
+                ].map(option => (
+                  <button
+                    key={option.value}
+                    onClick={() => setSortType(option.value as 'number' | 'firstNight' | 'otherNights')}
+                    className={`px-4 py-2 rounded-md transition-colors ${
+                      sortType === option.value
+                        ? 'bg-blue-500 text-white'
+                        : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
                 ))}
               </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm">显示特殊信息</span>
+                <button
+                  onClick={() => setShowSpecialInfo(!showSpecialInfo)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    showSpecialInfo ? 'bg-blue-500' : 'bg-gray-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      showSpecialInfo ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
-          )}
+            <div className={`overflow-x-auto rounded-lg border border-gray-200 ${infoModalPlayer ? 'hidden' : ''}`}>
+              <table className="w-full border-collapse bg-white relative">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-2 border-b border-gray-200">序号</th>
+                    <th className="px-4 py-2 border-b border-gray-200">角色</th>
+                    <th className="px-4 py-2 border-b border-gray-200">阵营</th>
+                    {showSpecialInfo && (
+                      <th className="px-4 py-2 border-b border-gray-200">特殊信息</th>
+                    )}
+                    <th className="px-4 py-2 border-b border-gray-200 w-16">死亡</th>
+                    <th className="px-4 py-2 border-b border-gray-200 w-16">中毒</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getSortedPlayers().map(player => {
+                    const isInActionOrder = sortType === 'number' || (
+                      sortType === 'firstNight' 
+                        ? FIRST_NIGHT_ORDER.includes(player.role.name)
+                        : OTHER_NIGHTS_ORDER.includes(player.role.name)
+                    )
+                    
+                    return (
+                      <tr 
+                        key={player.number} 
+                        className={`hover:bg-gray-50 border-b border-gray-200 ${
+                          player.isDead ? 'opacity-50' : ''
+                        } ${!isInActionOrder && sortType !== 'number' ? 'opacity-40' : ''}`}
+                      >
+                        <td 
+                          className="px-4 py-1.5 text-center cursor-pointer relative"
+                          onClick={() => handleInfoModalOpen(player)}
+                        >
+                          <div className={`inline-block ${player.specialInfo ? 'border-b-2 border-dotted border-blue-500' : ''}`}>
+                            {player.number}
+                          </div>
+                        </td>
+                        <td className="px-4 py-1.5 text-center whitespace-nowrap relative">
+                          <div 
+                            className={`inline-flex items-center justify-center ${
+                              player.specialInfo ? 'border-b-2 border-dotted border-blue-500 hover:border-blue-700 cursor-pointer' : ''
+                            }`}
+                            onClick={() => player.specialInfo && setActiveTooltip(activeTooltip === player.number ? null : player.number)}
+                          >
+                            {player.role.name}
+                            {player.drunkRole && ` (以为是${player.drunkRole.name})`}
+                            {player.isPillar && ' (柱子)'}
+                          </div>
+                          {activeTooltip === player.number && player.specialInfo && (
+                            <div className="absolute z-10 bg-white border border-gray-200 rounded-lg shadow-lg p-2 min-w-[200px] left-1/2 transform -translate-x-1/2 mt-1"
+                              style={{
+                                bottom: 'calc(100% + 5px)',
+                                marginBottom: '5px'
+                              }}
+                            >
+                              {player.specialInfo}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-1.5 text-center">
+                          <span className={`px-2 py-0.5 rounded-full text-sm whitespace-nowrap ${
+                            player.role.type === 'townsfolk' ? 'bg-blue-900 text-blue-200' :
+                            player.role.type === 'outsider' ? 'bg-green-900 text-green-200' :
+                            player.role.type === 'minion' ? 'bg-red-900 text-red-200' :
+                            'bg-purple-900 text-purple-200'
+                          }`}>
+                            {translations[player.role.type]}
+                          </span>
+                        </td>
+                        {showSpecialInfo && (
+                          <td className="px-4 py-1.5 text-center">
+                            <div className="text-sm whitespace-nowrap">
+                              {player.specialInfo || '-'}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-4 py-1.5 text-center">
+                          <button
+                            onClick={() => handlePlayerDeathChange(player)}
+                            className={`w-6 h-6 rounded-full border-2 inline-flex items-center justify-center transition-colors text-lg leading-none ${
+                              player.isDead 
+                                ? 'border-red-500 text-red-500 bg-red-50' 
+                                : 'border-gray-300 text-gray-300 hover:border-red-500 hover:text-red-500'
+                            }`}
+                          >
+                            {player.isDead ? '×' : ''}
+                          </button>
+                        </td>
+                        <td className="px-4 py-1.5 text-center">
+                          <button
+                            onClick={() => handlePoisonToggle(player.number)}
+                            className={`w-6 h-6 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
+                              poisonedPlayer === player.number
+                                ? 'border-purple-500 text-purple-500 bg-purple-50'
+                                : 'border-gray-300 text-gray-300 hover:border-purple-500 hover:text-purple-500'
+                            }`}
+                          >
+                            {poisonedPlayer === player.number ? '☠️' : ''}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           
           <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => {
@@ -600,16 +530,16 @@ export default function App() {
               return (
                 <div 
                   key={type}
-                  className={`p-4 rounded-lg ${
-                    type === 'townsfolk' ? 'bg-blue-100' :
-                    type === 'outsider' ? 'bg-green-100' :
-                    type === 'minion' ? 'bg-red-100' :
-                    'bg-purple-100'
+                  className={`p-4 rounded-lg border ${
+                    type === 'townsfolk' ? 'bg-blue-900/50 border-blue-700' :
+                    type === 'outsider' ? 'bg-green-900/50 border-green-700' :
+                    type === 'minion' ? 'bg-red-900/50 border-red-700' :
+                    'bg-purple-900/50 border-purple-700'
                   }`}
                 >
                   <div className="text-center">
                     <div className="font-bold mb-1">{translations[type]}</div>
-                    <div>
+                    <div className="text-sm">
                       存活: {alive} / {total}
                     </div>
                   </div>
@@ -619,6 +549,58 @@ export default function App() {
           </div>
         </>
       )}
+
+      {infoModalPlayer && (
+        <>
+          <div className="fixed inset-0 bg-black z-40" />
+          
+          <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4 relative">
+              {(() => {
+                const player = players.find(p => p.number === infoModalPlayer)
+                if (!player) return null
+                
+                const displayRole = player.role.name === '酒鬼' && player.drunkRole
+                  ? player.drunkRole.name
+                  : player.role.name
+
+                return (
+                  <>
+                    <h2 className="text-xl font-bold mb-4 text-center">{infoModalPlayer}号玩家信息</h2>
+                    <div className="text-center mb-4">
+                      <p className="text-2xl mb-2">{displayRole}</p>
+                      <p className="text-lg text-gray-600 mb-4">
+                        {translations[player.role.name === '酒鬼' ? 'townsfolk' : player.role.type]}
+                      </p>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          特殊信息
+                        </label>
+                        <textarea
+                          value={tempSpecialInfo}
+                          onChange={(e) => setTempSpecialInfo(e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-md min-h-[100px]"
+                          placeholder="输入特殊信息..."
+                        />
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => setInfoModalPlayer(null)}
+                        className="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
+                      >
+                        关闭
+                      </button>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
     </div>
   )
 }
+
