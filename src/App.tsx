@@ -9,14 +9,7 @@ import {
   FIRST_NIGHT_ORDER,
   OTHER_NIGHTS_ORDER 
 } from './constants'
-import {
-  handleWasherwomanInfo,
-  handleLibrarianInfo,
-  handleInvestigatorInfo,
-  handleChefInfo,
-  handleEmpathInfo,
-  handleDemonInfo
-} from './specialRoleInfoHandlers'
+import { generateSpecialInfo } from './specialRoleInfoHandlers'
 
 export default function App() {
   const [counts, setCounts] = useState<PlayerCounts>({
@@ -111,7 +104,7 @@ export default function App() {
       isDead: false
     }))
     
-    // 处理酒鬼特殊规则
+    // 修改酒鬼处理逻辑
     const drunkPlayer = newPlayers.find(player => player.role.name === '酒鬼')
     if (drunkPlayer) {
       const unusedVillagers = townsfolkRoles
@@ -119,6 +112,14 @@ export default function App() {
       if (unusedVillagers.length > 0) {
         const randomVillager = unusedVillagers[Math.floor(Math.random() * unusedVillagers.length)]
         drunkPlayer.drunkRole = { name: randomVillager, type: 'townsfolk' }
+        
+        // 为酒鬼生成其"以为自己是"的角色对应的特殊信息
+        drunkPlayer.specialInfo = generateSpecialInfo(
+          { ...drunkPlayer, role: drunkPlayer.drunkRole },
+          newPlayers,
+          undefined,
+          true
+        )
       }
     }
     
@@ -142,47 +143,21 @@ export default function App() {
     setPlayers(newPlayers)
     setViewedPlayers(new Set())
     
-    // 创建玩家数组后，处理洗衣妇的特殊信息
-    const washerwoman = newPlayers.find(player => player.role.name === '洗衣妇')
-    if (washerwoman) {
-      washerwoman.specialInfo = handleWasherwomanInfo(washerwoman, newPlayers)
-    }
-
-    // 处理调查员的特殊信息`
-    const librarian = newPlayers.find(player => player.role.name === '图书管理员')
-    if (librarian) {
-      librarian.specialInfo = handleLibrarianInfo(librarian, newPlayers)
-    }
-
-    // 处理调查员的特殊信息
-    const investigator = newPlayers.find(player => player.role.name === '调查员')
-    if (investigator) {
-      investigator.specialInfo = handleInvestigatorInfo(investigator, newPlayers)
-    }
-
-    // 在处理调查员的特殊信息之后，添加处理厨师的特殊信息
-    const chef = newPlayers.find(player => player.role.name === '厨师')
-    if (chef) {
-      chef.specialInfo = handleChefInfo(newPlayers)
-    }
-
-    // 在 createGame 函数中添加共情者的初始信息处理
-    const empath = newPlayers.find(player => player.role.name === '共情者')
-    if (empath) {
-      // 初始化共情者信息
-      updateEmpathInfo(empath, newPlayers)
-    }
-
-    // 在其他特殊信息处理之后添加
-    const demon2 = newPlayers.find(player => player.role.name === '小恶魔')
-    if (demon2) {
-      demon2.specialInfo = handleDemonInfo(remainingRoles)
-    }
+    // 为所有有特殊信息的角色生成信息
+    newPlayers.forEach(player => {
+      if (player.role.name !== '酒鬼') { // 酒鬼已经处理过了
+        player.specialInfo = generateSpecialInfo(
+          player,
+          newPlayers,
+          player.role.name === '小恶魔' ? remainingRoles : undefined,
+          poisonedPlayer === player.number
+        )
+      }
+    })
   }
 
-  // 在 App 组件中添加这个新函数
-  const updateEmpathInfo = (empath: Player, playersList: Player[]) => {
-    empath.specialInfo = handleEmpathInfo(empath, playersList)
+  const updateEmpathInfo = (empath: Player, playersList: Player[], isFalseInfo: boolean = false) => {
+    empath.specialInfo = generateSpecialInfo(empath, playersList, undefined, isFalseInfo)
   }
 
   // 修改死亡状态变更的处理函数
@@ -194,7 +169,7 @@ export default function App() {
     // 更新共情者信息
     const empath = newPlayers.find(p => p.role.name === '共情者')
     if (empath) {
-      updateEmpathInfo(empath, newPlayers)
+      updateEmpathInfo(empath, newPlayers, poisonedPlayer === empath.number)
     }
     
     setPlayers(newPlayers)
@@ -253,23 +228,44 @@ export default function App() {
       return
     }
     
-    setPoisonedPlayer(poisonedPlayer === playerNumber ? null : playerNumber)
+    const newPoisonedPlayer = poisonedPlayer === playerNumber ? null : playerNumber
+    setPoisonedPlayer(newPoisonedPlayer)
+
+    // 创建新的玩家数组
+    const newPlayers = [...players]
+    const targetPlayer = newPlayers.find(p => p.number === playerNumber)
+    
+    if (targetPlayer) {
+      // 只重新生成目标玩家的特殊信息
+      if (targetPlayer.role.name === '酒鬼' && targetPlayer.drunkRole) {
+        targetPlayer.specialInfo = generateSpecialInfo(
+          { ...targetPlayer, role: targetPlayer.drunkRole },
+          newPlayers,
+          undefined,
+          true // 酒鬼永远获得错误信息
+        )
+      } else {
+        targetPlayer.specialInfo = generateSpecialInfo(
+          targetPlayer,
+          newPlayers,
+          targetPlayer.role.name === '小恶魔' ? 
+            [...townsfolkRoles, ...outsiderRoles]
+              .filter(role => !players.some(player => player.role.name === role))
+              .sort(() => Math.random() - 0.5)
+              .slice(0, 3) 
+            : undefined,
+          newPoisonedPlayer === targetPlayer.number
+        )
+      }
+    }
+
+    setPlayers(newPlayers)
   }
 
   const handleInfoModalOpen = (player: Player) => {
     setInfoModalPlayer(player.number)
     
     let info = player.specialInfo || ''
-    
-    // 如果玩家中毒，添加中毒标记
-    if (poisonedPlayer === player.number) {
-      info = `${info} {{{中毒}}}`
-    }
-    
-    // 如果是酒鬼，添加酒鬼标记
-    if (player.role.name === '酒鬼') {
-      info = `${info} {{{酒鬼}}}`
-    }
     
     setTempSpecialInfo(info)
   }
