@@ -15,6 +15,8 @@ export const generateSpecialInfo = (player: Player, players: Player[], remaining
       return handleEmpathInfo(player, players, isFalseInfo)
     case '小恶魔':
       return remainingRoles ? handleDemonInfo(remainingRoles, isFalseInfo) : undefined
+    case '小精灵':
+      return handlePixieInfo(players, isFalseInfo)
     default:
       return undefined
   }
@@ -198,4 +200,20 @@ export const handleDemonInfo = (remainingRoles: string[], isFalseInfo: boolean =
     const shuffledRoles = [...remainingRoles].sort(() => Math.random() - 0.5)
     return `未使用善良角色：${shuffledRoles.join('，')}`
   }
+}
+
+// 处理小精灵的特殊信息
+export const handlePixieInfo = (players: Player[], isFalseInfo: boolean = false) => {
+  // 获取在场的镇民角色
+  const townsfolkPlayers = players.filter(p => 
+    p.role.type === 'townsfolk' && 
+    p.role.name !== '小精灵'
+  )
+  
+  if (townsfolkPlayers.length === 0) return undefined
+  
+  // 随机选择一个在场的镇民角色
+  const randomTownsfolk = townsfolkPlayers[Math.floor(Math.random() * townsfolkPlayers.length)]
+  
+  return `你必须伪装成${randomTownsfolk.role.name}`
 } 

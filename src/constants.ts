@@ -29,6 +29,7 @@ export const townsfolkRoles = [
   "杀手",
   "士兵",
   "市长",
+  "小精灵",
 ]
 
 export const outsiderRoles = [
@@ -66,6 +67,7 @@ export const FIRST_NIGHT_ORDER = [
   "占卜师",
   "管家",
   "间谍",
+  "小精灵",
 ]
 
 export const OTHER_NIGHTS_ORDER = [
