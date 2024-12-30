@@ -11,6 +11,42 @@ import {
 } from './constants'
 import { generateSpecialInfo } from './specialRoleInfoHandlers'
 
+// 角色标签组件
+const RoleTags = ({ players }: { players: Player[] }) => {
+  const activeRoles = new Set(players.map(p => p.role.name))
+  
+  const allRoles = [
+    { type: 'townsfolk', roles: townsfolkRoles },
+    { type: 'outsider', roles: outsiderRoles },
+    { type: 'minion', roles: minionRoles },
+    { type: 'demon', roles: ['小恶魔'] }
+  ]
+
+  return (
+    <div className="mb-4 bg-white rounded-lg p-4 shadow-md border border-gray-200">
+      <div className="flex flex-wrap gap-2">
+        {allRoles.map(({ type, roles }) => (
+          roles.map(role => (
+            <span
+              key={role}
+              className={`px-2 py-1 rounded-full text-sm whitespace-nowrap ${
+                activeRoles.has(role)
+                  ? type === 'townsfolk' ? 'bg-blue-900 text-blue-200' :
+                    type === 'outsider' ? 'bg-green-900 text-green-200' :
+                    type === 'minion' ? 'bg-red-900 text-red-200' :
+                    'bg-purple-900 text-purple-200'
+                  : 'bg-gray-200 text-gray-500'
+              }`}
+            >
+              {role}
+            </span>
+          ))
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [counts, setCounts] = useState<PlayerCounts>({
     townsfolk: 3,
@@ -22,7 +58,6 @@ export default function App() {
   const [players, setPlayers] = useState<Player[]>([])
   const [showPlayerView, setShowPlayerView] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
-  const [viewedPlayers, setViewedPlayers] = useState<Set<number>>(new Set())
   const [sortType, setSortType] = useState<'id' | 'firstNight' | 'otherNights'>('id')
   const [showSpecialInfo, setShowSpecialInfo] = useState(false)
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null)
@@ -141,7 +176,6 @@ export default function App() {
     }
 
     setPlayers(newPlayers)
-    setViewedPlayers(new Set())
     
     // 为所有有特殊信息的角色生成信息
     newPlayers.forEach(player => {
@@ -278,6 +312,8 @@ export default function App() {
             Exis的血染-暗流涌动DM工具箱
           </h1>
 
+          {players.length > 0 && <RoleTags players={players} />}
+
           <div className="flex flex-wrap items-center gap-4 justify-center mb-4">
             {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => (
               <div key={type} className="flex-shrink-0">
@@ -333,23 +369,15 @@ export default function App() {
             <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4">
               <h2 className="text-xl font-bold mb-4 text-center">选择你的座位号</h2>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mb-4">
-                {players.map(player => {
-                  const isViewed = viewedPlayers.has(player.number)
-                  return (
-                    <button
-                      key={player.number}
-                      onClick={() => setSelectedPlayer(player.number)}
-                      disabled={isViewed}
-                      className={`px-4 py-2 rounded-lg ${
-                        isViewed 
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                          : 'bg-blue-100 hover:bg-blue-200'
-                      }`}
-                    >
-                      {player.number}号
-                    </button>
-                  )
-                })}
+                {players.map(player => (
+                  <button
+                    key={player.number}
+                    onClick={() => setSelectedPlayer(player.number)}
+                    className="px-4 py-2 rounded-lg bg-blue-100 hover:bg-blue-200"
+                  >
+                    {player.number}号
+                  </button>
+                ))}
               </div>
               <button
                 onClick={() => setShowPlayerView(false)}
@@ -364,7 +392,6 @@ export default function App() {
         {selectedPlayer && (
           <div className="fixed inset-0 bg-black bg-opacity-0 flex items-center justify-center">
             <div className="bg-white p-6 rounded-lg max-w-lg w-full m-4">
-              <h2 className="text-xl font-bold mb-4 text-center">{selectedPlayer}号玩家的角色</h2>
               {(() => {
                 const player = players.find(p => p.number === selectedPlayer)
                 if (!player) return null
@@ -373,24 +400,65 @@ export default function App() {
                   ? player.drunkRole.name
                   : player.role.name
 
+                const isEvil = player.role.type === 'minion' || player.role.type === 'demon'
+                const evilTeammates = isEvil ? players.filter(p => 
+                  (p.role.type === 'minion' || p.role.type === 'demon') && 
+                  p.number !== player.number
+                ) : []
+
                 return (
-                  <div className="text-center mb-4">
-                    <p className="text-2xl mb-2">{displayRole}</p>
-                    <p className="text-lg text-gray-600">
-                      {translations[player.role.name === '酒鬼' ? 'townsfolk' : player.role.type]}
-                    </p>
-                  </div>
+                  <>
+                    <h2 className="text-xl font-bold mb-4 text-center">{selectedPlayer}号玩家的角色</h2>
+                    <div className="text-center mb-4">
+                      <p className="text-2xl mb-2">{displayRole}</p>
+                      <p className="text-lg text-gray-600 mb-4">
+                        {translations[player.role.name === '酒鬼' ? 'townsfolk' : player.role.type]}
+                      </p>
+                      
+                      {/* 只对坏人显示特殊信息 */}
+                      {isEvil && (
+                        <div className="mt-4 p-4 bg-gray-50 rounded-lg text-left">
+                          {/* 显示玩家自己的特殊信息 */}
+                          {player.specialInfo && (
+                            <div className="mb-4">
+                              <h3 className="font-bold mb-2">你的特殊信息：</h3>
+                              <p>{player.specialInfo}</p>
+                            </div>
+                          )}
+                          
+                          {/* 如果是爪牙，显示恶魔的特殊信息 */}
+                          {player.role.type === 'minion' && (
+                            <div className="mb-4">
+                              <h3 className="font-bold mb-2">恶魔的特殊信息：</h3>
+                              <p>{players.find(p => p.role.type === 'demon')?.specialInfo || '无'}</p>
+                            </div>
+                          )}
+                          
+                          {/* 显示邪恶阵营信息 */}
+                          {evilTeammates.length > 0 && (
+                            <div>
+                              <h3 className="font-bold mb-2">你的邪恶队友：</h3>
+                              <ul className="list-disc list-inside">
+                                {evilTeammates.map(teammate => (
+                                  <li key={teammate.number}>
+                                    {teammate.number}号 - {teammate.role.name}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSelectedPlayer(null)}
+                      className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                    >
+                      关闭
+                    </button>
+                  </>
                 )
               })()}
-              <button
-                onClick={() => {
-                  setViewedPlayers(prev => new Set([...prev, selectedPlayer]))
-                  setSelectedPlayer(null)
-                }}
-                className="w-full px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                关闭
-              </button>
             </div>
           </div>
         )}
