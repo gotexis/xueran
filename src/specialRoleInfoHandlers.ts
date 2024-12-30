@@ -203,7 +203,7 @@ export const handleDemonInfo = (remainingRoles: string[], isFalseInfo: boolean =
 }
 
 // 处理小精灵的特殊信息
-export const handlePixieInfo = (players: Player[], isFalseInfo: boolean = false) => {
+export const handlePixieInfo = (players: Player[], _isFalseInfo: boolean = false) => {
   // 获取在场的镇民角色
   const townsfolkPlayers = players.filter(p => 
     p.role.type === 'townsfolk' && 
