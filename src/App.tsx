@@ -312,7 +312,8 @@ export default function App() {
             Exis的血染-暗流涌动DM工具箱
           </h1>
 
-          {players.length > 0 && <RoleTags players={players} />}
+          {/* 只在非玩家视图且有玩家时显示角色标签 */}
+          {!showPlayerView && players.length > 0 && <RoleTags players={players} />}
 
           <div className="flex flex-wrap items-center gap-4 justify-center mb-4">
             {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => (
