@@ -12,7 +12,15 @@ import {
 import { generateSpecialInfo } from './specialRoleInfoHandlers'
 
 // 角色标签组件
-const RoleTags = ({ players }: { players: Player[] }) => {
+const RoleTags = ({ 
+  players, 
+  excludedRoles, 
+  onRoleClick 
+}: { 
+  players: Player[]; 
+  excludedRoles: Set<string>;
+  onRoleClick: (role: string) => void;
+}) => {
   const activeRoles = new Set(players.map(p => p.role.name))
   
   const allRoles = [
@@ -29,7 +37,9 @@ const RoleTags = ({ players }: { players: Player[] }) => {
           roles.map(role => (
             <span
               key={role}
-              className={`px-2 py-1 rounded-full text-sm whitespace-nowrap ${
+              onClick={() => onRoleClick(role)}
+              className={`px-2 py-1 rounded-full text-sm whitespace-nowrap cursor-pointer hover:opacity-80 ${
+                excludedRoles.has(role) ? 'opacity-50 ' : '' }${
                 activeRoles.has(role)
                   ? type === 'townsfolk' ? 'bg-blue-900 text-blue-200' :
                     type === 'outsider' ? 'bg-green-900 text-green-200' :
@@ -47,23 +57,114 @@ const RoleTags = ({ players }: { players: Player[] }) => {
   )
 }
 
+// 被排除的角色标签组件
+const ExcludedRoleTags = ({ 
+  excludedRoles,
+  onRoleClick 
+}: { 
+  excludedRoles: Set<string>;
+  onRoleClick: (role: string) => void;
+}) => {
+  if (excludedRoles.size === 0) return null;
+
+  const excludedRolesList = Array.from(excludedRoles);
+  
+  return (
+    <div className="mb-4 bg-gray-100 rounded-lg p-4 shadow-md border border-gray-200">
+      <h3 className="text-sm text-gray-600 mb-2">已排除的角色</h3>
+      <div className="flex flex-wrap gap-2">
+        {excludedRolesList.map(role => (
+          <span
+            key={role}
+            onClick={() => onRoleClick(role)}
+            className="px-2 py-1 rounded-full text-sm whitespace-nowrap cursor-pointer bg-gray-300 text-gray-600 hover:opacity-80"
+          >
+            {role}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
-  const [counts, setCounts] = useState<PlayerCounts>({
-    townsfolk: 3,
-    outsider: 0,
-    minion: 1,
-    demon: 1
+  const [counts, setCounts] = useState<PlayerCounts>(() => {
+    const saved = localStorage.getItem('bloodOnTheClock_counts')
+    return saved ? JSON.parse(saved) : {
+      townsfolk: 3,
+      outsider: 0,
+      minion: 1,
+      demon: 1
+    }
   })
   
-  const [players, setPlayers] = useState<Player[]>([])
+  const [players, setPlayers] = useState<Player[]>(() => {
+    const saved = localStorage.getItem('bloodOnTheClock_players')
+    return saved ? JSON.parse(saved) : []
+  })
+
+  const [excludedRoles, setExcludedRoles] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('bloodOnTheClock_excludedRoles')
+    return new Set(saved ? JSON.parse(saved) : ['小精灵', '变态'])
+  })
+
   const [showPlayerView, setShowPlayerView] = useState(false)
   const [selectedPlayer, setSelectedPlayer] = useState<number | null>(null)
   const [sortType, setSortType] = useState<'id' | 'firstNight' | 'otherNights'>('id')
   const [showSpecialInfo, setShowSpecialInfo] = useState(false)
   const [activeTooltip, setActiveTooltip] = useState<number | null>(null)
-  const [poisonedPlayer, setPoisonedPlayer] = useState<number | null>(null)
+  const [poisonedPlayer, setPoisonedPlayer] = useState<number | null>(() => {
+    const saved = localStorage.getItem('bloodOnTheClock_poisonedPlayer')
+    return saved ? JSON.parse(saved) : null
+  })
   const [infoModalPlayer, setInfoModalPlayer] = useState<number | null>(null)
   const [tempSpecialInfo, setTempSpecialInfo] = useState<string>('')
+
+  // 保存状态到localStorage
+  useEffect(() => {
+    localStorage.setItem('bloodOnTheClock_counts', JSON.stringify(counts))
+  }, [counts])
+
+  useEffect(() => {
+    localStorage.setItem('bloodOnTheClock_players', JSON.stringify(players))
+  }, [players])
+
+  useEffect(() => {
+    localStorage.setItem('bloodOnTheClock_excludedRoles', JSON.stringify(Array.from(excludedRoles)))
+  }, [excludedRoles])
+
+  useEffect(() => {
+    localStorage.setItem('bloodOnTheClock_poisonedPlayer', JSON.stringify(poisonedPlayer))
+  }, [poisonedPlayer])
+
+  // 重置游戏状态
+  const resetGame = () => {
+    if (!window.confirm('确定要重置游戏吗？这将清除所有游戏数据。')) {
+      return
+    }
+    setCounts({
+      townsfolk: 3,
+      outsider: 0,
+      minion: 1,
+      demon: 1
+    })
+    setPlayers([])
+    setExcludedRoles(new Set(['小精灵', '变态']))
+    setPoisonedPlayer(null)
+    setShowPlayerView(false)
+    setSelectedPlayer(null)
+    setSortType('id')
+    setShowSpecialInfo(false)
+    setActiveTooltip(null)
+    setInfoModalPlayer(null)
+    setTempSpecialInfo('')
+    
+    // 清除localStorage
+    localStorage.removeItem('bloodOnTheClock_counts')
+    localStorage.removeItem('bloodOnTheClock_players')
+    localStorage.removeItem('bloodOnTheClock_excludedRoles')
+    localStorage.removeItem('bloodOnTheClock_poisonedPlayer')
+  }
 
   // 从预设中选择玩家数量
   const handlePresetSelect = (totalPlayers: number) => {
@@ -78,22 +179,51 @@ export default function App() {
     }
   }
 
-  // 随机选择角色
+  // 处理角色点击
+  const handleRoleClick = (roleName: string) => {
+    setExcludedRoles(prev => {
+      const newExcluded = new Set(prev);
+      if (newExcluded.has(roleName)) {
+        newExcluded.delete(roleName);
+      } else {
+        newExcluded.add(roleName);
+      }
+      return newExcluded;
+    });
+  }
+
+  // 修改随机选择角色的逻辑
   const createGame = () => {
+    // 过滤掉被排除的角色
+    const availableTownsfolk = townsfolkRoles.filter(role => !excludedRoles.has(role))
+    const availableOutsiders = outsiderRoles.filter(role => !excludedRoles.has(role))
+    const availableMinions = minionRoles.filter(role => !excludedRoles.has(role))
+    const isDemonExcluded = excludedRoles.has('小恶魔')
+
+    if (
+      availableTownsfolk.length < counts.townsfolk ||
+      availableOutsiders.length < counts.outsider ||
+      availableMinions.length < counts.minion ||
+      isDemonExcluded
+    ) {
+      alert('可用角色不足，请减少排除的角色数量或调整玩家配置')
+      return
+    }
+
     // 随机选择村民
-    const shuffledVillagers = [...townsfolkRoles]
+    const shuffledVillagers = [...availableTownsfolk]
       .sort(() => Math.random() - 0.5)
       .slice(0, counts.townsfolk)
       .map(name => ({ name, type: 'townsfolk' as const }))
     
     // 随机选择外来者
-    const shuffledOutsiders = [...outsiderRoles]
+    const shuffledOutsiders = [...availableOutsiders]
       .sort(() => Math.random() - 0.5)
       .slice(0, counts.outsider)
       .map(name => ({ name, type: 'outsider' as const }))
     
     // 随机选择爪牙
-    const shuffledMinions = [...minionRoles]
+    const shuffledMinions = [...availableMinions]
       .sort(() => Math.random() - 0.5)
       .slice(0, counts.minion)
       .map(name => ({ name, type: 'minion' as const }))
@@ -308,12 +438,27 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <div className="max-w-4xl mx-auto p-4">
         <div className="mb-6 bg-white rounded-lg p-4 shadow-md border border-gray-200 ">
-          <h1 className="text-xl text-white px-2 mb-6 bg-gradient-to-r from-blue-500 to-purple-500">
-            Exis的血染-暗流涌动DM工具箱
-          </h1>
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-xl text-white px-2 bg-gradient-to-r from-blue-500 to-purple-500">
+              Exis的血染-暗流涌动DM工具箱
+            </h1>
+            {players.length > 0 && (
+              <button
+                onClick={resetGame}
+                className="px-4 py-1.5 bg-red-500 hover:bg-red-600 rounded transition-colors text-white shadow-md text-sm"
+              >
+                重置游戏
+              </button>
+            )}
+          </div>
 
           {/* 只在非玩家视图且有玩家时显示角色标签 */}
-          {!showPlayerView && players.length > 0 && <RoleTags players={players} />}
+          {!showPlayerView && players.length > 0 && (
+            <>
+              <RoleTags players={players} excludedRoles={excludedRoles} onRoleClick={handleRoleClick} />
+              <ExcludedRoleTags excludedRoles={excludedRoles} onRoleClick={handleRoleClick} />
+            </>
+          )}
 
           <div className="flex flex-wrap items-center gap-4 justify-center mb-4">
             {(['townsfolk', 'outsider', 'minion', 'demon'] as const).map(type => (

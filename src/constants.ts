@@ -30,6 +30,7 @@ export const townsfolkRoles = [
   "士兵",
   "市长",
   "小精灵",
+  "变态",
 ]
 
 export const outsiderRoles = [
