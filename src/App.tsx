@@ -273,7 +273,11 @@ export default function App() {
     const drunkPlayer = newPlayers.find(player => player.role.name === '酒鬼')
     if (drunkPlayer) {
       const unusedVillagers = townsfolkRoles
-        .filter(name => !selectedRoles.some(role => role.name === name))
+        .filter(name => 
+          !selectedRoles.some(role => role.name === name) && 
+          !excludedRoles.has(name) &&
+          name !== '酒鬼'
+        )
       if (unusedVillagers.length > 0) {
         const randomVillager = unusedVillagers[Math.floor(Math.random() * unusedVillagers.length)]
         drunkPlayer.drunkRole = { name: randomVillager, type: 'townsfolk' }
@@ -291,7 +295,12 @@ export default function App() {
     // 在创建完 selectedRoles 后，找出未使用的村民和外来者角色
     const usedRoles = new Set(selectedRoles.map(role => role.name))
     const remainingRoles = [...townsfolkRoles, ...outsiderRoles]
-      .filter(role => !usedRoles.has(role))
+      .filter(role => 
+        !usedRoles.has(role) && 
+        !excludedRoles.has(role) &&
+        role !== '小精灵' && 
+        role !== '酒鬼'
+      )
       .sort(() => Math.random() - 0.5)
       .slice(0, 3) // 随机选择3个未使用的角色
     
@@ -414,7 +423,12 @@ export default function App() {
           newPlayers,
           targetPlayer.role.name === '小恶魔' ? 
             [...townsfolkRoles, ...outsiderRoles]
-              .filter(role => !players.some(player => player.role.name === role))
+              .filter(role => 
+                !players.some(player => player.role.name === role) && 
+                !excludedRoles.has(role) &&
+                role !== '小精灵' && 
+                role !== '酒鬼'
+              )
               .sort(() => Math.random() - 0.5)
               .slice(0, 3) 
             : undefined,
